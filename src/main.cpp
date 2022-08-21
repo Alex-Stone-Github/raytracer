@@ -24,6 +24,7 @@ int main() {
 			SDL_WINDOW_SHOWN);
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
 
+	//
 	
 
 	while (true) {
