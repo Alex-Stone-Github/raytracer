@@ -10,3 +10,7 @@ bool check_intersection(const Box box, const Vector3 point) {
 	}
 	return false;
 }
+
+Box nobox() {
+	return Box{Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0)};
+}

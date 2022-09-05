@@ -5,11 +5,12 @@
 #include "../include/vector3.hpp"
 #include "../include/box.hpp"
 #include "../include/ray.hpp"
+#include "../include/camera.hpp"
 
 #define HORIZONTAL_FOV 90
 #define VERTICAL_FOV 90
-#define VIEWPORT_WIDTH 600
-#define VIEWPORT_HEIGHT 520
+#define VIEWPORT_WIDTH 800
+#define VIEWPORT_HEIGHT 600
 
 std::vector<Box> boxes;
 
@@ -18,26 +19,30 @@ double map(double value, double a, double b, double x, double y) {
 	return percent * (y - x) + x;
 }
 
-void render(double* fb) {
+void render(double* fb, const Camera& c) {
 	for (int x = 0; x < VIEWPORT_WIDTH; x ++) {
 		for (int y = 0; y < VIEWPORT_HEIGHT; y ++) {
 			// blank it out
-			int i = x * VIEWPORT_HEIGHT + y;
-			fb[i] = 100;
-			double aangle = map(x, 0, VIEWPORT_WIDTH, -((double)HORIZONTAL_FOV/2), (double)HORIZONTAL_FOV/2);
-			double hangle = map(y, 0, VIEWPORT_HEIGHT, -((double)VERTICAL_FOV/2), (double)VERTICAL_FOV/2);
+			int i = (x * VIEWPORT_HEIGHT + y) * 3;
+			fb[i] = 0;
+			fb[i + 1] = 0;
+			fb[i + 2] = 200;
+			double offset_aangle = map(x, 0, VIEWPORT_WIDTH, -((double)HORIZONTAL_FOV/2), (double)HORIZONTAL_FOV/2);
+			double offset_hangle = map(y, 0, VIEWPORT_HEIGHT, -((double)VERTICAL_FOV/2), (double)VERTICAL_FOV/2);
 			#define PI 3.141592653589793
-			aangle = aangle / 180 * PI;
-			hangle = hangle / 180 * PI;
+			offset_aangle = offset_aangle / 180 * PI;
+			offset_hangle = offset_hangle / 180 * PI;
 			
 			Vector3 direction(
-					std::sin(aangle),
-					std::sin(hangle),
-					std::cos(aangle));
+					std::sin(c.aangle / 180 * PI + offset_aangle),
+					std::sin(c.hangle / 180 * PI + offset_hangle),
+					std::cos(c.aangle / 180 * PI + offset_aangle));
 
-			bool raymarch = ray_march(Vector3(0, 0, 0), direction, boxes);
-			if (raymarch) {
-				fb[i] = 0;
+			col_info collision = ray_march(Vector3(0, 0, 0), direction, boxes);
+			if (collision.collided) {
+				fb[i] = collision.box.color.x;
+				fb[i + 1] = collision.box.color.y;
+				fb[i + 2] = collision.box.color.z;
 			}
 		}
 	}
@@ -54,9 +59,18 @@ int main() {
 			SDL_WINDOW_SHOWN);
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
 
+	// creating things
+	Camera camera = {Vector3(0, 0, 0), 0, 0};
+	camera.aangle = 30;
 	boxes.push_back(Box{
 			position: Vector3(0, 0, 70),
-			size: Vector3(10, 10, 10)
+			size: Vector3(20, 20, 20),
+			color: Vector3(0, 255, 0)
+			});	
+	boxes.push_back(Box{
+			position: Vector3(-10, -10, 90),
+			size: Vector3(20, 20, 20),
+			color: Vector3(200, 200, 0)
 			});	
 
 	while (true) {
@@ -70,24 +84,25 @@ int main() {
 					break;
 			}
 		}
-		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 		SDL_RenderClear(renderer);
 
 		// rendering
-		double* framebuffer = new double[VIEWPORT_WIDTH * VIEWPORT_HEIGHT];
-		render(framebuffer);
+		double* framebuffer = new double[VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 3]; // 3 for colors
+		render(framebuffer, camera);
 		for (int x = 0; x < VIEWPORT_WIDTH; x ++) {
 			for (int y = 0; y < VIEWPORT_HEIGHT; y ++) {
-				int brightness = framebuffer[x * VIEWPORT_HEIGHT + y];
-				SDL_SetRenderDrawColor(renderer, brightness, brightness, brightness, 255);
+				int r = framebuffer[(x * VIEWPORT_HEIGHT + y) * 3];
+				int g = framebuffer[(x * VIEWPORT_HEIGHT + y) * 3 + 1];
+				int b = framebuffer[(x * VIEWPORT_HEIGHT + y) * 3 + 2];
+				SDL_SetRenderDrawColor(renderer, r, g, b, 255);
 				SDL_RenderDrawPoint(renderer, x, y);
 			}
 		}
 		delete[] framebuffer;
 
 		SDL_RenderPresent(renderer);
-		SDL_Delay(7000/60);
-
+		SDL_Delay(1000/60);
 	}
 exit:
 	SDL_DestroyRenderer(renderer);
