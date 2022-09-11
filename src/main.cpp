@@ -19,7 +19,7 @@ double map(double value, double a, double b, double x, double y) {
 	return percent * (y - x) + x;
 }
 
-void render(double* fb, const Camera& c) {
+void render(double* fb, const Camera& c, const Vector3& lightPosition) {
 	for (int x = 0; x < VIEWPORT_WIDTH; x ++) {
 		for (int y = 0; y < VIEWPORT_HEIGHT; y ++) {
 			// blank it out
@@ -39,10 +39,23 @@ void render(double* fb, const Camera& c) {
 					std::cos(c.aangle / 180 * PI + offset_aangle));
 
 			col_info collision = ray_march(Vector3(0, 0, 0), direction, boxes);
+            // directionalLighting
+            //bool isInLight = !ray_march(collision.point, directionalLight.scale(-1), boxes).collided;
+            Vector3 direction_to_light = (lightPosition + collision.point.scale(-1)).norm(); // same as subraction
+            bool isInLight = !ray_march(collision.point, direction_to_light, boxes).collided;
+
+
 			if (collision.collided) {
-				fb[i] = collision.box.color.x;
-				fb[i + 1] = collision.box.color.y;
-				fb[i + 2] = collision.box.color.z;
+                if (isInLight) { 
+                    fb[i] = collision.box.color.x;
+                    fb[i + 1] = collision.box.color.y;
+                    fb[i + 2] = collision.box.color.z;
+                }
+                else {
+                    fb[i] = collision.box.color.x * .0;
+                    fb[i + 1] = collision.box.color.y * .0;
+                    fb[i + 2] = collision.box.color.z * .0;
+                }
 			}
 		}
 	}
@@ -60,19 +73,22 @@ int main() {
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
 
 	// creating things
-	Camera camera = {Vector3(0, 0, 0), 0, 0};
-	camera.aangle = 30;
 	boxes.push_back(Box{
 			position: Vector3(0, 0, 70),
-			size: Vector3(20, 20, 20),
-			color: Vector3(0, 255, 0)
+			size: Vector3(10, 20, 20),
+			color: Vector3(0, 255, 0),
+            radius: 10.0
 			});	
 	boxes.push_back(Box{
-			position: Vector3(-10, -10, 90),
+			position: Vector3(0, 0, 90),
 			size: Vector3(20, 20, 20),
-			color: Vector3(200, 200, 0)
+			color: Vector3(200, 200, 0),
+            radius: 10.0
 			});	
 
+    
+	Camera camera = {Vector3(0, 0, 0), 0, 0};
+    Vector3 lightPosition(0, 0, 0);
 	while (true) {
 		SDL_Event e;
 		while (SDL_PollEvent(&e)) {
@@ -87,9 +103,12 @@ int main() {
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 		SDL_RenderClear(renderer);
 
+	    camera.aangle = 0;
+        boxes[1].position.x = 15;
+        lightPosition.z +=10;
 		// rendering
 		double* framebuffer = new double[VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 3]; // 3 for colors
-		render(framebuffer, camera);
+		render(framebuffer, camera, lightPosition);
 		for (int x = 0; x < VIEWPORT_WIDTH; x ++) {
 			for (int y = 0; y < VIEWPORT_HEIGHT; y ++) {
 				int r = framebuffer[(x * VIEWPORT_HEIGHT + y) * 3];
@@ -100,6 +119,7 @@ int main() {
 			}
 		}
 		delete[] framebuffer;
+
 
 		SDL_RenderPresent(renderer);
 		SDL_Delay(1000/60);
